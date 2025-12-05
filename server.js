@@ -21,6 +21,13 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+// Verify transporter on startup to catch auth/network issues early
+transporter.verify().then(() => {
+  console.log('SMTP transporter is ready');
+}).catch((err) => {
+  console.error('SMTP transporter verification failed:', err && err.message ? err.message : err);
+});
+
 // Route
 app.post("/send-email", async (req, res) => {
   const { firstName, lastName, company, email, phoneNumber, message, country } = req.body;
@@ -45,8 +52,18 @@ ${message}
     res.status(200).json({ message: "Email sent successfully!" });
   } catch (error) {
     console.error("Error sending email:", error);
-    res.status(500).json({ message: "Failed to send email." });
+    // Return additional error information when debugging is enabled
+    const responseBody = { message: "Failed to send email." };
+    if (process.env.DEBUG === 'true' || process.env.NODE_ENV !== 'production') {
+      responseBody.error = error && error.message ? error.message : String(error);
+    }
+    res.status(500).json(responseBody);
   }
+});
+
+// Health check route
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', uptime: process.uptime() });
 });
 
 // Default route
